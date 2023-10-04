@@ -217,6 +217,9 @@ open class OkHttpClient internal constructor(
   @get:JvmName("minWebSocketMessageToCompress")
   val minWebSocketMessageToCompress: Long = builder.minWebSocketMessageToCompress
 
+  @get:JvmName("socketSourceSinkTransformer")
+  val socketSourceSinkTransformer: SocketSourceSinkTransformer = builder.socketSourceSinkTransformer
+
   val routeDatabase: RouteDatabase = builder.routeDatabase ?: RouteDatabase()
 
   constructor() : this(Builder())
@@ -496,6 +499,7 @@ open class OkHttpClient internal constructor(
     internal var writeTimeout = 10_000
     internal var pingInterval = 0
     internal var minWebSocketMessageToCompress = RealWebSocket.DEFAULT_MINIMUM_DEFLATE_SIZE
+    internal var socketSourceSinkTransformer: SocketSourceSinkTransformer = SocketSourceSinkTransformer.NONE
     internal var routeDatabase: RouteDatabase? = null
 
     internal constructor(okHttpClient: OkHttpClient) : this() {
@@ -528,6 +532,7 @@ open class OkHttpClient internal constructor(
       this.writeTimeout = okHttpClient.writeTimeoutMillis
       this.pingInterval = okHttpClient.pingIntervalMillis
       this.minWebSocketMessageToCompress = okHttpClient.minWebSocketMessageToCompress
+      this.socketSourceSinkTransformer = okHttpClient.socketSourceSinkTransformer
       this.routeDatabase = okHttpClient.routeDatabase
     }
 
@@ -595,6 +600,10 @@ open class OkHttpClient internal constructor(
      */
     fun eventListenerFactory(eventListenerFactory: EventListener.Factory) = apply {
       this.eventListenerFactory = eventListenerFactory
+    }
+
+    fun socketSourceSinkTransformer(socketSourceSinkTransformer: SocketSourceSinkTransformer) = apply {
+      this.socketSourceSinkTransformer = socketSourceSinkTransformer
     }
 
     /**

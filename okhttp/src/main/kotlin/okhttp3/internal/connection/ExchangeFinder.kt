@@ -15,13 +15,9 @@
  */
 package okhttp3.internal.connection
 
+import okhttp3.*
 import java.io.IOException
 import java.net.Socket
-import okhttp3.Address
-import okhttp3.EventListener
-import okhttp3.HttpUrl
-import okhttp3.OkHttpClient
-import okhttp3.Route
 import okhttp3.internal.canReuseConnectionFor
 import okhttp3.internal.closeQuietly
 import okhttp3.internal.http.ExchangeCodec
@@ -57,7 +53,8 @@ class ExchangeFinder(
   private val connectionPool: RealConnectionPool,
   internal val address: Address,
   private val call: RealCall,
-  private val eventListener: EventListener
+  private val eventListener: EventListener,
+  private val socketSourceSinkTransformer: SocketSourceSinkTransformer,
 ) {
   private var routeSelection: RouteSelector.Selection? = null
   private var routeSelector: RouteSelector? = null
@@ -230,7 +227,8 @@ class ExchangeFinder(
           pingIntervalMillis,
           connectionRetryEnabled,
           call,
-          eventListener
+          eventListener,
+          socketSourceSinkTransformer,
       )
     } finally {
       call.connectionToCancel = null

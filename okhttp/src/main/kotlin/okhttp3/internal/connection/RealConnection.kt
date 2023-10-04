@@ -16,6 +16,7 @@
  */
 package okhttp3.internal.connection
 
+import okhttp3.*
 import java.io.IOException
 import java.lang.ref.Reference
 import java.net.ConnectException
@@ -30,20 +31,7 @@ import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import javax.net.ssl.SSLPeerUnverifiedException
 import javax.net.ssl.SSLSocket
-import okhttp3.Address
-import okhttp3.Call
-import okhttp3.CertificatePinner
-import okhttp3.Connection
-import okhttp3.ConnectionSpec
-import okhttp3.EventListener
-import okhttp3.Handshake
 import okhttp3.Handshake.Companion.handshake
-import okhttp3.HttpUrl
-import okhttp3.OkHttpClient
-import okhttp3.Protocol
-import okhttp3.Request
-import okhttp3.Response
-import okhttp3.Route
 import okhttp3.internal.EMPTY_RESPONSE
 import okhttp3.internal.assertThreadDoesntHoldLock
 import okhttp3.internal.assertThreadHoldsLock
@@ -170,7 +158,8 @@ class RealConnection(
     pingIntervalMillis: Int,
     connectionRetryEnabled: Boolean,
     call: Call,
-    eventListener: EventListener
+    eventListener: EventListener,
+    socketSourceSinkTransformer: SocketSourceSinkTransformer,
   ) {
     check(protocol == null) { "already connected" }
 
@@ -198,15 +187,15 @@ class RealConnection(
     while (true) {
       try {
         if (route.requiresTunnel()) {
-          connectTunnel(connectTimeout, readTimeout, writeTimeout, call, eventListener)
+          connectTunnel(connectTimeout, readTimeout, writeTimeout, call, eventListener, socketSourceSinkTransformer)
           if (rawSocket == null) {
             // We were unable to connect the tunnel but properly closed down our resources.
             break
           }
         } else {
-          connectSocket(connectTimeout, readTimeout, call, eventListener)
+          connectSocket(connectTimeout, readTimeout, call, eventListener, socketSourceSinkTransformer)
         }
-        establishProtocol(connectionSpecSelector, pingIntervalMillis, call, eventListener)
+        establishProtocol(connectionSpecSelector, pingIntervalMillis, call, eventListener, socketSourceSinkTransformer)
         eventListener.connectEnd(call, route.socketAddress, route.proxy, protocol)
         break
       } catch (e: IOException) {
@@ -253,12 +242,13 @@ class RealConnection(
     readTimeout: Int,
     writeTimeout: Int,
     call: Call,
-    eventListener: EventListener
+    eventListener: EventListener,
+    socketSourceSinkTransformer: SocketSourceSinkTransformer,
   ) {
     var tunnelRequest: Request = createTunnelRequest()
     val url = tunnelRequest.url
     for (i in 0 until MAX_TUNNEL_ATTEMPTS) {
-      connectSocket(connectTimeout, readTimeout, call, eventListener)
+      connectSocket(connectTimeout, readTimeout, call, eventListener, socketSourceSinkTransformer)
       tunnelRequest = createTunnel(readTimeout, writeTimeout, tunnelRequest, url)
           ?: break // Tunnel successfully created.
 
@@ -278,7 +268,8 @@ class RealConnection(
     connectTimeout: Int,
     readTimeout: Int,
     call: Call,
-    eventListener: EventListener
+    eventListener: EventListener,
+    socketSourceSinkTransformer: SocketSourceSinkTransformer,
   ) {
     val proxy = route.proxy
     val address = route.address
@@ -304,8 +295,8 @@ class RealConnection(
     // https://github.com/square/okhttp/issues/3245
     // https://android-review.googlesource.com/#/c/271775/
     try {
-      source = rawSocket.source().buffer()
-      sink = rawSocket.sink().buffer()
+      source = socketSourceSinkTransformer.mapSource(rawSocket.source()).buffer()
+      sink = socketSourceSinkTransformer.mapSink(rawSocket.sink()).buffer()
     } catch (npe: NullPointerException) {
       if (npe.message == NPE_THROW_WITH_NULL) {
         throw IOException(npe)
@@ -318,7 +309,8 @@ class RealConnection(
     connectionSpecSelector: ConnectionSpecSelector,
     pingIntervalMillis: Int,
     call: Call,
-    eventListener: EventListener
+    eventListener: EventListener,
+    socketSourceSinkTransformer: SocketSourceSinkTransformer,
   ) {
     if (route.address.sslSocketFactory == null) {
       if (Protocol.H2_PRIOR_KNOWLEDGE in route.address.protocols) {
@@ -334,7 +326,7 @@ class RealConnection(
     }
 
     eventListener.secureConnectStart(call)
-    connectTls(connectionSpecSelector)
+    connectTls(connectionSpecSelector, socketSourceSinkTransformer)
     eventListener.secureConnectEnd(call, handshake)
 
     if (protocol === Protocol.HTTP_2) {
@@ -359,7 +351,10 @@ class RealConnection(
   }
 
   @Throws(IOException::class)
-  private fun connectTls(connectionSpecSelector: ConnectionSpecSelector) {
+  private fun connectTls(
+    connectionSpecSelector: ConnectionSpecSelector,
+    socketSourceSinkTransformer: SocketSourceSinkTransformer,
+  ) {
     val address = route.address
     val sslSocketFactory = address.sslSocketFactory
     var success = false
@@ -418,8 +413,8 @@ class RealConnection(
         null
       }
       socket = sslSocket
-      source = sslSocket.source().buffer()
-      sink = sslSocket.sink().buffer()
+      source = socketSourceSinkTransformer.mapSource(sslSocket.source()).buffer()
+      sink = socketSourceSinkTransformer.mapSink(sslSocket.sink()).buffer()
       protocol = if (maybeProtocol != null) Protocol.get(maybeProtocol) else Protocol.HTTP_1_1
       success = true
     } finally {
