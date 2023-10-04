@@ -295,8 +295,8 @@ class RealConnection(
     // https://github.com/square/okhttp/issues/3245
     // https://android-review.googlesource.com/#/c/271775/
     try {
-      source = socketSourceSinkTransformer.mapSource(rawSocket.source()).buffer()
-      sink = socketSourceSinkTransformer.mapSink(rawSocket.sink()).buffer()
+      source = socketSourceSinkTransformer.mapSource(rawSocket, rawSocket.source()).buffer()
+      sink = socketSourceSinkTransformer.mapSink(rawSocket, rawSocket.sink()).buffer()
     } catch (npe: NullPointerException) {
       if (npe.message == NPE_THROW_WITH_NULL) {
         throw IOException(npe)
@@ -413,8 +413,8 @@ class RealConnection(
         null
       }
       socket = sslSocket
-      source = socketSourceSinkTransformer.mapSource(sslSocket.source()).buffer()
-      sink = socketSourceSinkTransformer.mapSink(sslSocket.sink()).buffer()
+      source = socketSourceSinkTransformer.mapSource(sslSocket, sslSocket.source()).buffer()
+      sink = socketSourceSinkTransformer.mapSink(sslSocket, sslSocket.sink()).buffer()
       protocol = if (maybeProtocol != null) Protocol.get(maybeProtocol) else Protocol.HTTP_1_1
       success = true
     } finally {
