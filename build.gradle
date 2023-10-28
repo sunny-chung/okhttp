@@ -246,7 +246,7 @@ subprojects { project ->
 
     publications {
       maven(MavenPublication) {
-        groupId = project.group
+        groupId = "io.github.sunny-chung" // project.group
         artifactId = project.ext.artifactId
         version = project.version
         if (bom) {
@@ -292,8 +292,8 @@ subprojects { project ->
         name = "mavencentral"
         url = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
         credentials {
-          username System.getenv('SONATYPE_NEXUS_USERNAME')
-          password System.getenv('SONATYPE_NEXUS_PASSWORD')
+          username SONATYPE_NEXUS_USERNAME
+          password SONATYPE_NEXUS_PASSWORD
         }
       }
     }
